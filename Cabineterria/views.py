@@ -160,17 +160,17 @@ class Logout(View):
 
 class Profile(View):
     @method_decorator(login_required(login_url='login'))
-    def get(self, request, username):  # Changed from pk to username
+    def get(self, request, username):
         try:
-            profile_user = User.objects.get(username=username)  # Using username to query
+            profile_user = User.objects.get(username__iexact=username)
             user_cabinets = CabinetModel.objects.filter(owner=profile_user)
 
             context = {
-                'profile_user': profile_user,  # Changed from 'user' to 'profile_user' to avoid conflicts
+                'profile_user': profile_user,
                 'user_cabinets': user_cabinets,
                 'is_owner': request.user == profile_user
             }
             return render(request, 'profile.html', context)
         except User.DoesNotExist:
-            messages.error(request, "user not found")
+            messages.error(request, "User not found")
             return redirect('home')

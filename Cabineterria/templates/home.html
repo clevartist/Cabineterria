@@ -13,7 +13,7 @@
 {% endif %}
 
 {% if user.is_authenticated %}
-  <a href="{% url 'profile' user.username%}">{{ user.username }}</a>
+  <a href="{% url 'profile' user.username.lower %}">{{ user.username }}</a>
   <form method="POST" action="{% url 'logout' %}">
     {% csrf_token %}
     <input type="submit" value="Log out" />

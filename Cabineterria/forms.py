@@ -22,3 +22,11 @@ class SignupForm(forms.ModelForm):
         help_texts = {
             'username': None,
         }
+    
+    def clean_username(self):
+        username = self.cleaned_data['username'].lower()
+        
+        if User.objects.filter(username__iexact=username).exists():
+            raise forms.ValidationError("Username already exists.")
+        
+        return username
