@@ -17,14 +17,18 @@ class CabinetView(View):
         try:
             # Split the path into cabinet names
             cabinet_names = cabinet_path.split('/')
+            print(f"CABINET_NAMES: {cabinet_names}")
             current_cabinet = None
             
             # Traverse through the path
             for name in cabinet_names:
                 if current_cabinet is None:
                     current_cabinet = CabinetModel.objects.get(name=name, parent=None)
+                    print(f"NAME: {name}")
+                    print(f"CURRENT_CABINET: {current_cabinet}")
                 else:
                     current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
+                    print(f"CURRENT_CABINET: {current_cabinet}")
             
             if current_cabinet is None:
                 return redirect('home')
@@ -62,7 +66,7 @@ class BuildCabinet(View):
         
         # ...until here
 
-        
+
         form = CabinetForm(request.POST)
         if form.is_valid():
             cabinet = form.save(commit=False)
