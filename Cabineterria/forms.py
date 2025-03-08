@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 class CabinetForm(forms.ModelForm):
     class Meta:
         model = CabinetModel
-        fields = ['name', 'description', 'parent']
+        fields = ['name', 'description']
 
 class LoginForm(forms.ModelForm):
     class Meta:

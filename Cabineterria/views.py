@@ -21,8 +21,6 @@ class CabinetView(View):
             
             # Traverse through the path
             for name in cabinet_names:
-                if not name:  # Skip empty strings from double slashes
-                    continue
                 if current_cabinet is None:
                     current_cabinet = CabinetModel.objects.get(name=name, parent=None)
                 else:
@@ -44,16 +42,32 @@ class CabinetView(View):
 
 class BuildCabinet(View):
     @method_decorator(login_required(login_url='login'))
-    def get(self, request):
+    def get(self, request, cabinet_path):
         form = CabinetForm()
-        return render(request, 'buildCab.html', {'form': form, 'cabinets': CabinetModel.objects.all()})
+        return render(request, 'buildCab.html', {'form': form})
     
     @method_decorator(login_required(login_url='login'))
-    def post(self, request):
+    def post(self, request, cabinet_path):
+
+        # deifining current cabinet...
+        
+        cabinet_names = cabinet_path.split('/')
+        current_cabinet = None
+
+        for name in cabinet_names:
+            if current_cabinet is None:
+                current_cabinet = CabinetModel.objects.get(name=name, parent=None)
+            else:
+                current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
+        
+        # ...until here
+
+        
         form = CabinetForm(request.POST)
         if form.is_valid():
             cabinet = form.save(commit=False)
             cabinet.owner = request.user
+            cabinet.parent = current_cabinet
             cabinet.save()
             return redirect('home')
         

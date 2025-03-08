@@ -7,6 +7,7 @@
   <p>made by {{cabinet.owner}}</p>
   <p>{{ cabinet.description }}</p>
   <a href="{% url 'build_subcabinet' cabinet_path %}">build a subcabinet</a>
+  <hr>
   
   {% if children %}
     {% for child in children %}
