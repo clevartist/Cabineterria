@@ -38,7 +38,7 @@ class CabinetView(View):
             }
             return render(request, 'cabinet.html', context)
         except CabinetModel.DoesNotExist:
-            print(f"Cabinet not found: {cabinet_path}")  # Debug print
+            print(f"Cabinet not found: {cabinet_path}")
             return redirect('home')
 
 
