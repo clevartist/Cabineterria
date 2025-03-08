@@ -3,4 +3,15 @@
 
 {% block content %}
 <h1>{{user.username}}</h1>
+
+{% if user_cabinets %}
+    <h3>Cabinets built:</h3>
+    
+    {% for cabinet in user_cabinets %}
+        <a href="{% url 'cabinet' cabinet.name %}">{{ cabinet.name }}</a>
+        <p>{{ cabinet.description }}</p>
+        <hr>
+    {% endfor %}
+{% endif %}
+
 {% endblock %}

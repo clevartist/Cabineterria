@@ -163,7 +163,7 @@ class Profile(View):
     def get(self, request, username):
         try:
             profile_user = User.objects.get(username__iexact=username)
-            user_cabinets = CabinetModel.objects.filter(owner=profile_user)
+            user_cabinets = CabinetModel.objects.filter(owner=profile_user, parent=None)
 
             context = {
                 'profile_user': profile_user,
