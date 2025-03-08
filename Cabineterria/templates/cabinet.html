@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}{{cabinet.name}} - Cabineterria{% endblock %} 
+
+{% block content %}
+<div>
+  <h2>{{ cabinet.name }}</h2>
+  <p>made by {{cabinet.owner}}</p>
+  <p>{{ cabinet.description }}</p>
+  
+  {% if children %}
+    {% for child in children %}
+    <div>
+      <a href="{% url 'cabinet' child.id %}">{{ child.name }}</a>
+      <p>{{ child.description }}</p>
+    </div>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

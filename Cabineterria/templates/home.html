@@ -1,0 +1,30 @@
+{% extends "base.html" %} 
+{% block title %}Home - Cabineterria{% endblock %} 
+
+{% block content %}
+<h1>Cabineterria</h1>
+
+{% if user.is_authenticated %}
+  <p>{{ user.username }}</p>
+  <form method="POST" action="{% url 'logout' %}">
+    {% csrf_token %}
+    <input type="submit" value="Log out" />
+  </form>
+{% else %}
+  <a href="{% url 'login' %}">Log in</a>
+  <a href="{% url 'signup' %}">Sign up</a>
+{% endif %}
+
+<a href="{% url 'build_cabinet' %}">Build a new cabinet</a>
+
+<hr/>
+
+{% for cabinet in cabinets %}
+<div class="cabinet">
+  <a href="{% url 'cabinet' cabinet.id %}">{{ cabinet.name }}</a>
+  <p>{{ cabinet.description }}</p>
+  <hr />
+</div>
+{% endfor %}
+
+{% endblock %}
