@@ -6,11 +6,13 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.contrib.auth.models import User
 from .forms import CabinetForm, LoginForm, SignupForm
+from django.contrib import messages
+
 
 class Home(View):
     def get(self, request):
         cabinets = CabinetModel.objects.filter(parent=None)
-        return render(request, 'home.html', {'cabinets': cabinets})
+        return render(request, 'home.html', {'cabinets': cabinets, 'user': request.user})
 
 class CabinetView(View):
     def get(self, request, cabinet_path):
@@ -45,15 +47,44 @@ class CabinetView(View):
 
 
 class BuildCabinet(View):
+
+
     @method_decorator(login_required(login_url='login'))
     def get(self, request, cabinet_path):
+
+
+        # defining current_cabinet
+        try:
+            cabinet_names = cabinet_path.split('/')
+            current_cabinet = None
+            for name in cabinet_names:
+                if current_cabinet is None:
+                    current_cabinet = CabinetModel.objects.get(name=name, parent=None)
+                else:
+                    current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
+        except CabinetModel.DoesNotExist:
+            messages.error(request, "cabinet not found")
+            return redirect('home')
+        
+
+
+        # Now check permissions using the computed current_cabinet
+        if request.user != current_cabinet.owner:
+            messages.error(request, "You do not have permission to build a subcabinet in a strange cabinet")
+            return redirect('home')
+        
+
+
         form = CabinetForm()
         return render(request, 'buildCab.html', {'form': form})
     
+
+
+
     @method_decorator(login_required(login_url='login'))
     def post(self, request, cabinet_path):
 
-        # deifining current cabinet...
+        # defining current cabinet... (imma copy-paste this everywhere)
         
         cabinet_names = cabinet_path.split('/')
         current_cabinet = None
@@ -125,3 +156,21 @@ class Logout(View):
     def post(self, request):
         logout(request)
         return redirect('home')
+
+
+class Profile(View):
+    @method_decorator(login_required(login_url='login'))
+    def get(self, request, username):  # Changed from pk to username
+        try:
+            profile_user = User.objects.get(username=username)  # Using username to query
+            user_cabinets = CabinetModel.objects.filter(owner=profile_user)
+
+            context = {
+                'profile_user': profile_user,  # Changed from 'user' to 'profile_user' to avoid conflicts
+                'user_cabinets': user_cabinets,
+                'is_owner': request.user == profile_user
+            }
+            return render(request, 'profile.html', context)
+        except User.DoesNotExist:
+            messages.error(request, "user not found")
+            return redirect('home')

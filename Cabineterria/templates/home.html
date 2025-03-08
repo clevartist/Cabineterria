@@ -4,8 +4,16 @@
 {% block content %}
 <h1>Cabineterria</h1>
 
+{% if messages %}
+    {% for message in messages %}
+        <div class="message" style="color: red;">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
 {% if user.is_authenticated %}
-  <p>{{ user.username }}</p>
+  <a href="{% url 'profile' user.username%}">{{ user.username }}</a>
   <form method="POST" action="{% url 'logout' %}">
     {% csrf_token %}
     <input type="submit" value="Log out" />
@@ -26,5 +34,16 @@
   <hr />
 </div>
 {% endfor %}
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+      var messages = document.querySelectorAll('.message');
+      messages.forEach(function(message) {
+          setTimeout(function() {
+              message.style.display = 'none';
+          }, 3000);
+      });
+  });
+</script>
 
 {% endblock %}

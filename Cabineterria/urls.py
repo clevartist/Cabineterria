@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.urls import path, re_path
-from .views import Home, CabinetView, BuildCabinet, Login, Signup, Logout
+from .views import Home, CabinetView, BuildCabinet, Login, Signup, Logout, Profile
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -11,4 +11,5 @@ urlpatterns = [
     path('login/', Login.as_view(), name='login'),
     path('signup/', Signup.as_view(), name='signup'),
     path('logout/', Logout.as_view(), name='logout'),
+    path('profile/<str:username>/', Profile.as_view(), name='profile')
 ]
