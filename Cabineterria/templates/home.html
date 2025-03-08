@@ -21,7 +21,7 @@
 
 {% for cabinet in cabinets %}
 <div class="cabinet">
-  <a href="{% url 'cabinet' cabinet.id %}">{{ cabinet.name }}</a>
+  <a href="{% url 'cabinet' cabinet.name %}">{{ cabinet.name }}</a>
   <p>{{ cabinet.description }}</p>
   <hr />
 </div>

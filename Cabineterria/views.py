@@ -13,15 +13,32 @@ class Home(View):
         return render(request, 'home.html', {'cabinets': cabinets})
 
 class CabinetView(View):
-    def get(self, request, pk):
+    def get(self, request, cabinet_path):
         try:
-            cab = CabinetModel.objects.get(id=pk)
+            # Split the path into cabinet names
+            cabinet_names = cabinet_path.split('/')
+            current_cabinet = None
+            
+            # Traverse through the path
+            for name in cabinet_names:
+                if not name:  # Skip empty strings from double slashes
+                    continue
+                if current_cabinet is None:
+                    current_cabinet = CabinetModel.objects.get(name=name, parent=None)
+                else:
+                    current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
+            
+            if current_cabinet is None:
+                return redirect('home')
+                
             context = {
-                'cabinet': cab,
-                'children': cab.children.all()
+                'cabinet': current_cabinet,
+                'children': current_cabinet.children.all(),
+                'cabinet_path': cabinet_path
             }
             return render(request, 'cabinet.html', context)
         except CabinetModel.DoesNotExist:
+            print(f"Cabinet not found: {cabinet_path}")  # Debug print
             return redirect('home')
 
 

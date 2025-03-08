@@ -10,7 +10,7 @@
   {% if children %}
     {% for child in children %}
     <div>
-      <a href="{% url 'cabinet' child.id %}">{{ child.name }}</a>
+      <a href="{% url 'cabinet' cabinet_path|add:'/'|add:child.name %}">{{ child.name }}</a>
       <p>{{ child.description }}</p>
     </div>
     {% endfor %}
