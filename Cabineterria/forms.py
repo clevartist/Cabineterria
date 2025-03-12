@@ -1,11 +1,15 @@
 from django import forms
-from .models import CabinetModel
+from .models import CabinetModel, Answer
 from django.contrib.auth.models import User
 
 class CabinetForm(forms.ModelForm):
     class Meta:
         model = CabinetModel
-        fields = ['name', 'description']
+        fields = ['name', 'description', 'requires_questions']
+
+class AnswerForm(forms.ModelForm):
+    class Meta:
+        model = Answer
 
 class LoginForm(forms.ModelForm):
     class Meta:
