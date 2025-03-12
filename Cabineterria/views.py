@@ -112,6 +112,39 @@ class BuildCabinet(View):
         }
         return render(request, 'buildCab.html', context)
 
+class Answer(View):
+    def get(self, request):
+
+        # defining current cabinet
+        try:
+            cabinet_names = cabinet_path.split('/')
+            current_cabinet = None
+            for name in cabinet_names:
+                if current_cabinet is None:
+                    current_cabinet = CabinetModel.objects.get(name=name, parent=None)
+                else:
+                    current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
+        except CabinetModel.DoesNotExist:
+            messages.error(request, "cabinet not found")
+            return redirect('home')
+        
+        context = {
+            'cabinet': current_cabinet
+        }
+        return render(request, 'answer.html', context)
+    
+    
+    def post(self, request)
+
+        # defining current cabinet
+        cabinet_names = cabinet_path.split('/')
+        current_cabinet = None
+
+        for name in cabinet_names:
+            if current_cabinet is None:
+                current_cabinet = CabinetModel.objects.get(name=name, parent=None)
+            else:
+                current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
 
 class Login(View):
     def get(self, request):
