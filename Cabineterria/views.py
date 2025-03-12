@@ -1,11 +1,11 @@
 from django.shortcuts import render, redirect
 from django.views import View
-from .models import CabinetModel
+from .models import CabinetModel, Question
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.contrib.auth.models import User
-from .forms import CabinetForm, LoginForm, SignupForm
+from .forms import CabinetForm, LoginForm, SignupForm, AnswerForm
 from django.contrib import messages
 
 
@@ -113,38 +113,41 @@ class BuildCabinet(View):
         return render(request, 'buildCab.html', context)
 
 class Answer(View):
-    def get(self, request):
+    def get(self, request, cabinet_id):
+        cabinet = CabinetModel.objects.get(id=cabinet_id)
+        if not cabinet.requires_questions:
+            return redirect('cabinet', cabinet_path=cabinet.name)
 
-        # defining current cabinet
-        try:
-            cabinet_names = cabinet_path.split('/')
-            current_cabinet = None
-            for name in cabinet_names:
-                if current_cabinet is None:
-                    current_cabinet = CabinetModel.objects.get(name=name, parent=None)
-                else:
-                    current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
-        except CabinetModel.DoesNotExist:
-            messages.error(request, "cabinet not found")
+        questions = cabinet.questions.all()
+        if not questions:
+            messages.error(request, "No questions available for this cabinet")
             return redirect('home')
+
+        form = QuestionChoicesForm(questions.first())
+        return render(request, 'answer_question.html', {
+            'form': form,
+            'cabinet': cabinet
+        })
+
+    def post(self, request, cabinet_id):
+        cabinet = CabinetModel.objects.get(id=cabinet_id)
+        question = cabinet.questions.first()
+        form = QuestionChoicesForm(question, request.POST)
         
-        context = {
-            'cabinet': current_cabinet
-        }
-        return render(request, 'answer.html', context)
-    
-    
-    def post(self, request)
-
-        # defining current cabinet
-        cabinet_names = cabinet_path.split('/')
-        current_cabinet = None
-
-        for name in cabinet_names:
-            if current_cabinet is None:
-                current_cabinet = CabinetModel.objects.get(name=name, parent=None)
+        if form.is_valid():
+            selected_answer = form.cleaned_data['answer']
+            if selected_answer.is_correct:
+                # Handle correct answer
+                messages.success(request, "Correct answer!")
+                return redirect('cabinet', cabinet_path=cabinet.name)
             else:
-                current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
+                messages.error(request, "Incorrect answer. Please try again.")
+                
+        return render(request, 'answer_question.html', {
+            'form': form,
+            'cabinet': cabinet
+        })
+
 
 class Login(View):
     def get(self, request):
