@@ -48,69 +48,67 @@ class CabinetView(View):
 
 class BuildCabinet(View):
 
+    @method_decorator(login_required(login_url='login'))
+    def get(self, request, cabinet_path=None):
+        if cabinet_path:
+            # Existing logic for building a subcabinet
+            try:
+                cabinet_names = cabinet_path.split('/')
+                current_cabinet = None
+                for name in cabinet_names:
+                    if current_cabinet is None:
+                        current_cabinet = CabinetModel.objects.get(name=name, parent=None)
+                    else:
+                        current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
+            except CabinetModel.DoesNotExist:
+                messages.error(request, "Cabinet not found")
+                return redirect('home')
+            
+            if request.user != current_cabinet.owner:
+                messages.error(request, "You do not have permission to build a subcabinet in a strange cabinet")
+                return redirect('home')
+            
+            form = CabinetForm()
+            return render(request, 'buildCab.html', {'form': form})
+        else:
+            # Logic for building a top-level cabinet (no parent)
+            form = CabinetForm()
+            return render(request, 'buildCab.html', {'form': form})
 
     @method_decorator(login_required(login_url='login'))
-    def get(self, request, cabinet_path):
-
-
-        # defining current_cabinet
-        try:
-            cabinet_names = cabinet_path.split('/')
-            current_cabinet = None
-            for name in cabinet_names:
-                if current_cabinet is None:
-                    current_cabinet = CabinetModel.objects.get(name=name, parent=None)
-                else:
-                    current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
-        except CabinetModel.DoesNotExist:
-            messages.error(request, "cabinet not found")
-            return redirect('home')
-        
-
-
-        # Now check permissions using the computed current_cabinet
-        if request.user != current_cabinet.owner:
-            messages.error(request, "You do not have permission to build a subcabinet in a strange cabinet")
-            return redirect('home')
-        
-
-
-        form = CabinetForm()
-        return render(request, 'buildCab.html', {'form': form})
-    
-
-
-
-    @method_decorator(login_required(login_url='login'))
-    def post(self, request, cabinet_path):
-
-        # defining current cabinet... (imma copy-paste this everywhere)
-        
-        cabinet_names = cabinet_path.split('/')
-        current_cabinet = None
-
-        for name in cabinet_names:
-            if current_cabinet is None:
-                current_cabinet = CabinetModel.objects.get(name=name, parent=None)
-            else:
-                current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
-        
-        # ...until here
-
-
-        form = CabinetForm(request.POST)
-        if form.is_valid():
-            cabinet = form.save(commit=False)
-            cabinet.owner = request.user
-            cabinet.parent = current_cabinet
-            cabinet.save()
-            return redirect('home')
-        
-        context = {
-            'cabinets': CabinetModel.objects.all(),
-            'form': form
-        }
-        return render(request, 'buildCab.html', context)
+    def post(self, request, cabinet_path=None):
+        if cabinet_path:
+            try:
+                cabinet_names = cabinet_path.split('/')
+                current_cabinet = None
+                for name in cabinet_names:
+                    if current_cabinet is None:
+                        current_cabinet = CabinetModel.objects.get(name=name, parent=None)
+                    else:
+                        current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
+            except CabinetModel.DoesNotExist:
+                messages.error(request, "Cabinet not found")
+                return redirect('home')
+            
+            form = CabinetForm(request.POST)
+            if form.is_valid():
+                cabinet = form.save(commit=False)
+                cabinet.owner = request.user
+                cabinet.parent = current_cabinet
+                cabinet.save()
+                return redirect('home')
+            context = {'form': form}
+            return render(request, 'buildCab.html', context)
+        else:
+            # For top-level cabinet building
+            form = CabinetForm(request.POST)
+            if form.is_valid():
+                cabinet = form.save(commit=False)
+                cabinet.owner = request.user
+                # parent remains None for top-level cabinets
+                cabinet.save()
+                return redirect('home')
+            return render(request, 'buildCab.html', {'form': form})
 
 class Answer(View):
     def get(self, request, cabinet_id):
@@ -123,8 +121,8 @@ class Answer(View):
             messages.error(request, "No questions available for this cabinet")
             return redirect('home')
 
-        form = QuestionChoicesForm(questions.first())
-        return render(request, 'answer_question.html', {
+        form = AnswerForm(questions.first())
+        return render(request, 'quiz.html', {
             'form': form,
             'cabinet': cabinet
         })
@@ -132,7 +130,7 @@ class Answer(View):
     def post(self, request, cabinet_id):
         cabinet = CabinetModel.objects.get(id=cabinet_id)
         question = cabinet.questions.first()
-        form = QuestionChoicesForm(question, request.POST)
+        form = AnswerForm(question, request.POST)
         
         if form.is_valid():
             selected_answer = form.cleaned_data['answer']
@@ -143,7 +141,7 @@ class Answer(View):
             else:
                 messages.error(request, "Incorrect answer. Please try again.")
                 
-        return render(request, 'answer_question.html', {
+        return render(request, 'quiz.html', {
             'form': form,
             'cabinet': cabinet
         })
