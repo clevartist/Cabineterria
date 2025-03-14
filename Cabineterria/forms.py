@@ -9,10 +9,11 @@ class CabinetForm(forms.ModelForm):
 
 class AnswerForm(forms.Form):
     def __init__(self, question, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.question = question
 
         answers = [(answer.id, answer.title)for answer in question.answers.all()]
-        self.fields['answers'] = forms.ChoiceField(
+        self.fields['answer'] = forms.ChoiceField(
             choices=answers,
             widget=forms.RadioSelect(attrs={'class': 'btn-check'}),
             label = question.title

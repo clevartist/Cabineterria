@@ -14,6 +14,7 @@ class Home(View):
         cabinets = CabinetModel.objects.filter(parent=None)
         return render(request, 'home.html', {'cabinets': cabinets, 'user': request.user})
 
+
 class CabinetView(View):
     def get(self, request, cabinet_path):
         try:
@@ -21,20 +22,31 @@ class CabinetView(View):
             cabinet_names = cabinet_path.split('/')
             print(f"CABINET_NAMES: {cabinet_names}")
             current_cabinet = None
-            
+
             # Traverse through the path
             for name in cabinet_names:
                 if current_cabinet is None:
-                    current_cabinet = CabinetModel.objects.get(name=name, parent=None)
+                    current_cabinet = CabinetModel.objects.get(
+                        name=name, parent=None)
                     print(f"NAME: {name}")
                     print(f"CURRENT_CABINET: {current_cabinet}")
+                    print(f"CABINET_PATH: {cabinet_path}")
                 else:
-                    current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
+                    current_cabinet = CabinetModel.objects.get(
+                        name=name, parent=current_cabinet)
+
+                    # redirect if "requires_questions" is True
+                    if current_cabinet.requires_questions:
+                        return redirect('answer_questions', cabinet_id=current_cabinet.id)
+
                     print(f"CURRENT_CABINET: {current_cabinet}")
-            
+
             if current_cabinet is None:
                 return redirect('home')
-                
+            
+            if current_cabinet.requires_questions:
+                return redirect("answer_questions", cabinet_id=current_cabinet.id)
+
             context = {
                 'cabinet': current_cabinet,
                 'children': current_cabinet.children.all(),
@@ -57,17 +69,20 @@ class BuildCabinet(View):
                 current_cabinet = None
                 for name in cabinet_names:
                     if current_cabinet is None:
-                        current_cabinet = CabinetModel.objects.get(name=name, parent=None)
+                        current_cabinet = CabinetModel.objects.get(
+                            name=name, parent=None)
                     else:
-                        current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
+                        current_cabinet = CabinetModel.objects.get(
+                            name=name, parent=current_cabinet)
             except CabinetModel.DoesNotExist:
                 messages.error(request, "Cabinet not found")
                 return redirect('home')
-            
+
             if request.user != current_cabinet.owner:
-                messages.error(request, "You do not have permission to build a subcabinet in a strange cabinet")
+                messages.error(
+                    request, "You do not have permission to build a subcabinet in a strange cabinet")
                 return redirect('home')
-            
+
             form = CabinetForm()
             return render(request, 'buildCab.html', {'form': form})
         else:
@@ -83,13 +98,15 @@ class BuildCabinet(View):
                 current_cabinet = None
                 for name in cabinet_names:
                     if current_cabinet is None:
-                        current_cabinet = CabinetModel.objects.get(name=name, parent=None)
+                        current_cabinet = CabinetModel.objects.get(
+                            name=name, parent=None)
                     else:
-                        current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
+                        current_cabinet = CabinetModel.objects.get(
+                            name=name, parent=current_cabinet)
             except CabinetModel.DoesNotExist:
                 messages.error(request, "Cabinet not found")
                 return redirect('home')
-            
+
             form = CabinetForm(request.POST)
             if form.is_valid():
                 cabinet = form.save(commit=False)
@@ -109,6 +126,7 @@ class BuildCabinet(View):
                 cabinet.save()
                 return redirect('home')
             return render(request, 'buildCab.html', {'form': form})
+
 
 class Answer(View):
     def get(self, request, cabinet_id):
@@ -131,20 +149,30 @@ class Answer(View):
         cabinet = CabinetModel.objects.get(id=cabinet_id)
         question = cabinet.questions.first()
         form = AnswerForm(question, request.POST)
-        
+    
         if form.is_valid():
             selected_answer = form.cleaned_data['answer']
             if selected_answer.is_correct:
-                # Handle correct answer
-                messages.success(request, "Correct answer!")
-                return redirect('cabinet', cabinet_path=cabinet.name)
+                # "Unlock" the cabinet by marking it as no longer requiring questions.
+                cabinet.requires_questions = False
+                cabinet.save()
+
+                # Build the full path for the cabinet
+                path_parts = []
+                current = cabinet
+                while current:
+                    path_parts.insert(0, current.name)
+                    current = current.parent
+                cabinet_path = '/'.join(path_parts)
+                return redirect('cabinet', cabinet_path=cabinet_path)
             else:
                 messages.error(request, "Incorrect answer. Please try again.")
-                
+                return redirect('home')
+        
         return render(request, 'quiz.html', {
             'form': form,
             'cabinet': cabinet
-        })
+    })
 
 
 class Login(View):
@@ -156,7 +184,7 @@ class Login(View):
             'form': form
         }
         return render(request, 'login.html', context)
-    
+
     def post(self, request):
         form = LoginForm()
         username = request.POST.get('username')
@@ -172,11 +200,12 @@ class Login(View):
         }
         return render(request, 'login.html', context)
 
+
 class Signup(View):
     def get(self, request):
         form = SignupForm()
         return render(request, 'signup.html', {'form': form})
-    
+
     def post(self, request):
         username = request.POST.get('username')
         email = request.POST.get('email')
@@ -185,6 +214,7 @@ class Signup(View):
         user.save()
         login(request, user)
         return redirect('home')
+
 
 class Logout(View):
     def post(self, request):
@@ -197,7 +227,8 @@ class Profile(View):
     def get(self, request, username):
         try:
             profile_user = User.objects.get(username__iexact=username)
-            user_cabinets = CabinetModel.objects.filter(owner=profile_user, parent=None)
+            user_cabinets = CabinetModel.objects.filter(
+                owner=profile_user, parent=None)
 
             context = {
                 'profile_user': profile_user,
