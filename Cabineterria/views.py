@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 from django.views import View
-from .models import CabinetModel, Question
+from .models import CabinetModel, UserCabinetStatus
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
@@ -12,41 +12,36 @@ from django.contrib import messages
 class Home(View):
     def get(self, request):
         cabinets = CabinetModel.objects.filter(parent=None)
-        return render(request, 'home.html', {'cabinets': cabinets, 'user': request.user})
+
+        all_cabinets = CabinetModel.objects.all()
+        all_cabinets.requires_questions = True
+
+        context = {'cabinets': cabinets, 'user': request.user}
+        return render(request, 'home.html', context)
 
 
 class CabinetView(View):
     def get(self, request, cabinet_path):
         try:
-            # Split the path into cabinet names
             cabinet_names = cabinet_path.split('/')
-            print(f"CABINET_NAMES: {cabinet_names}")
             current_cabinet = None
-
-            # Traverse through the path
             for name in cabinet_names:
                 if current_cabinet is None:
-                    current_cabinet = CabinetModel.objects.get(
-                        name=name, parent=None)
-                    print(f"NAME: {name}")
-                    print(f"CURRENT_CABINET: {current_cabinet}")
-                    print(f"CABINET_PATH: {cabinet_path}")
+                    current_cabinet = CabinetModel.objects.get(name=name, parent=None)
                 else:
-                    current_cabinet = CabinetModel.objects.get(
-                        name=name, parent=current_cabinet)
-
-                    # redirect if "requires_questions" is True
-                    if current_cabinet.requires_questions:
-                        return redirect('answer_questions', cabinet_id=current_cabinet.id)
-
-                    print(f"CURRENT_CABINET: {current_cabinet}")
-
+                    current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
             if current_cabinet is None:
                 return redirect('home')
-            
-            if current_cabinet.requires_questions:
-                return redirect("answer_questions", cabinet_id=current_cabinet.id)
+            # Check if the current user locked this cabinet.
+            try:
+                status = UserCabinetStatus.objects.get(user=request.user, cabinet=current_cabinet)
+                user_locked = status.locked
+            except UserCabinetStatus.DoesNotExist:
+                user_locked = True
 
+            if current_cabinet.requires_questions and user_locked:
+                return redirect('answer_questions', cabinet_id=current_cabinet.id)
+                
             context = {
                 'cabinet': current_cabinet,
                 'children': current_cabinet.children.all(),
@@ -54,7 +49,6 @@ class CabinetView(View):
             }
             return render(request, 'cabinet.html', context)
         except CabinetModel.DoesNotExist:
-            print(f"Cabinet not found: {cabinet_path}")
             return redirect('home')
 
 
@@ -153,9 +147,14 @@ class Answer(View):
         if form.is_valid():
             selected_answer = form.cleaned_data['answer']
             if selected_answer.is_correct:
-                # "Unlock" the cabinet by marking it as no longer requiring questions.
-                cabinet.requires_questions = False
-                cabinet.save()
+                status, created = UserCabinetStatus.objects.get_or_create(
+                    user = request.user,
+                    cabinet = cabinet,
+                    defaults={"locked": False}
+                )
+                if not created:
+                    status.locked = False
+                    status.save()
 
                 # Build the full path for the cabinet
                 path_parts = []

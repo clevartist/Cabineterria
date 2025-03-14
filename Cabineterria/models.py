@@ -51,3 +51,15 @@ class Answers(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['question'], condition=models.Q(is_correct=True), name="unique_correct_choice")
         ]
+
+
+class UserCabinetStatus(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    cabinet = models.ForeignKey(CabinetModel, on_delete=models.CASCADE)
+    locked = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together=('user', 'cabinet')
+    
+    def __str__(self):
+        return f"{self.user.username} : {self.cabinet.name} -> {"LOCKED" if self.locked else "UNLOCKED"}"
