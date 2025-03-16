@@ -1,192 +1,139 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.views import View
-from .models import CabinetModel, UserCabinetStatus
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
-from django.contrib.auth.models import User
-from .forms import CabinetForm, LoginForm, SignupForm, AnswerForm
 from django.contrib import messages
+from django.contrib.auth.models import User
+from .models import CabinetModel, UserCabinetStatus
+from .forms import CabinetForm, LoginForm, SignupForm, AnswerForm
+from .utils import get_cabinet_from_path, validate_cabinet_access
 
 
 class Home(View):
     def get(self, request):
-        # Reset cabinets with 'requires_questions_remember=True'
-        cabinets_to_reset = CabinetModel.objects.filter(requires_questions_remember=True)
-        cabinets_to_reset.update(requires_questions=True)  # Reset to original value
-        
-        # Reset user's locked status for these cabinets
-        if request.user.is_authenticated:
-            for cabinet in cabinets_to_reset:
-                UserCabinetStatus.objects.update_or_create(
-                    user=request.user,
-                    cabinet=cabinet,
-                    defaults={'locked': True}  # Force re-answering
-                )
-        
-        # Display top-level cabinets on home page
+        self.reset_question_cabinets(request.user)
         cabinets = CabinetModel.objects.filter(parent=None)
-        context = {'cabinets': cabinets, 'user': request.user}
-        return render(request, 'home.html', context)
+        return render(request, 'home.html', {'cabinets': cabinets})
+
+    def reset_question_cabinets(self, user):
+        # Reset cabinets requiring questions and user lock status
+        cabinets = CabinetModel.objects.filter(requires_questions_remember=True)
+        cabinets.update(requires_questions=True)
+        
+        if user.is_authenticated:
+            UserCabinetStatus.objects.filter(
+                cabinet__in=cabinets, 
+                user=user
+            ).update(locked=True)
+            
+            existing = UserCabinetStatus.objects.filter(
+                user=user, 
+                cabinet__in=cabinets
+            ).values_list('cabinet_id', flat=True)
+            
+            bulk_create = [
+                UserCabinetStatus(user=user, cabinet=cab, locked=True)
+                for cab in cabinets.exclude(id__in=existing)
+            ]
+            UserCabinetStatus.objects.bulk_create(bulk_create)
 
 
 class CabinetView(View):
     def get(self, request, cabinet_path):
-        try:
-            cabinet_names = cabinet_path.split('/')
-            current_cabinet = None
-            for name in cabinet_names:
-                if current_cabinet is None:
-                    current_cabinet = CabinetModel.objects.get(name=name, parent=None)
-                else:
-                    current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
-            if current_cabinet is None:
-                return redirect('home')
-                
-            # Check individual user's locked state
-            try:
-                status = UserCabinetStatus.objects.get(user=request.user, cabinet=current_cabinet)
-                user_locked = status.locked
-            except UserCabinetStatus.DoesNotExist:
-                user_locked = True
-
-            if current_cabinet.requires_questions and user_locked:
-                return redirect('answer_questions', cabinet_id=current_cabinet.id)
-                
-            context = {
-                'cabinet': current_cabinet,
-                'children': current_cabinet.children.all(),
-                'cabinet_path': cabinet_path
-            }
-            return render(request, 'cabinet.html', context)
-        except CabinetModel.DoesNotExist:
+        cabinet = get_cabinet_from_path(cabinet_path)
+        if not cabinet:
             return redirect('home')
 
+        if not validate_cabinet_access(request.user, cabinet):
+            return redirect('answer_questions', cabinet_id=cabinet.id)
 
+        return render(request, 'cabinet.html', {
+            'cabinet': cabinet,
+            'children': cabinet.children.all(),
+            'cabinet_path': cabinet_path
+        })
+
+
+@method_decorator(login_required, name='dispatch')
 class BuildCabinet(View):
-
-    @method_decorator(login_required(login_url='login'))
     def get(self, request, cabinet_path=None):
-        if cabinet_path:
-            try:
-                cabinet_names = cabinet_path.split('/')
-                current_cabinet = None
-                for name in cabinet_names:
-                    if current_cabinet is None:
-                        current_cabinet = CabinetModel.objects.get(
-                            name=name, parent=None)
-                    else:
-                        current_cabinet = CabinetModel.objects.get(
-                            name=name, parent=current_cabinet)
-            except CabinetModel.DoesNotExist:
-                messages.error(request, "Cabinet not found")
-                return redirect('home')
+        parent = self._get_valid_parent(request.user, cabinet_path)
+        if cabinet_path and not parent:
+            return redirect('home')
+        return render(request, 'buildCab.html', {'form': CabinetForm()})
 
-            if request.user != current_cabinet.owner:
-                messages.error(
-                    request, "You do not have permission to build a subcabinet in a strange cabinet")
-                return redirect('home')
-
-            form = CabinetForm()
-            return render(request, 'buildCab.html', {'form': form})
-        else:
-            # Logic for building a top-level cabinet (no parent)
-            form = CabinetForm()
-            return render(request, 'buildCab.html', {'form': form})
-
-    @method_decorator(login_required(login_url='login'))
     def post(self, request, cabinet_path=None):
-        if cabinet_path:
-            try:
-                cabinet_names = cabinet_path.split('/')
-                current_cabinet = None
-                for name in cabinet_names:
-                    if current_cabinet is None:
-                        current_cabinet = CabinetModel.objects.get(
-                            name=name, parent=None)
-                    else:
-                        current_cabinet = CabinetModel.objects.get(
-                            name=name, parent=current_cabinet)
-            except CabinetModel.DoesNotExist:
-                messages.error(request, "Cabinet not found")
-                return redirect('home')
+        parent = self._get_valid_parent(request.user, cabinet_path)
+        form = CabinetForm(request.POST)
+        
+        if form.is_valid():
+            return self._handle_valid_form(form, request.user, parent)
+        
+        return render(request, 'buildCab.html', {'form': form})
 
-
-            form = CabinetForm(request.POST)
-            if form.is_valid():
-                cabinet = form.save()
-                cabinet.owner = request.user
-                cabinet.parent = current_cabinet
-                if cabinet.requires_questions:
-                    cabinet.requires_questions_remember = True
-                
-                cabinet.save()
-                return redirect('home')
+    def _get_valid_parent(self, user, path):
+        """Validate and return parent cabinet if path exists"""
+        if not path:
+            return None
             
+        parent = get_cabinet_from_path(path)
+        if parent and parent.owner != user:
+            messages.error(self.request, "Permission denied")
+            return None
+        return parent
 
-            context = {'form': form}
-            return render(request, 'buildCab.html', context)
-        else:
-            # For top-level cabinet building
-            form = CabinetForm(request.POST)
-            if form.is_valid():
-                cabinet = form.save()
-                cabinet.owner = request.user
-                cabinet.save()
-                return redirect('home')
-            return render(request, 'buildCab.html', {'form': form})
+    def _handle_valid_form(self, form, user, parent):
+        """Process valid cabinet form"""
+        cabinet = form.save(commit=False)
+        cabinet.owner = user
+        cabinet.parent = parent
+        cabinet.requires_questions_remember = cabinet.requires_questions
+        cabinet.save()
+        messages.success(self.request, "Cabinet created successfully")
+        return redirect('home')
 
 
 class Answer(View):
     def get(self, request, cabinet_id):
-        cabinet = CabinetModel.objects.get(id=cabinet_id)
+        cabinet = get_object_or_404(CabinetModel, id=cabinet_id)
+        return self._handle_question_flow(request, cabinet)
+
+    def post(self, request, cabinet_id):
+        cabinet = get_object_or_404(CabinetModel, id=cabinet_id)
+        form = AnswerForm(cabinet.questions.first(), request.POST)
+        
+        if not form.is_valid():
+            return render(request, 'quiz.html', {'form': form, 'cabinet': cabinet})
+
+        if form.cleaned_data['answer'].is_correct:
+            self._unlock_cabinet(request.user, cabinet)
+            return redirect('cabinet', cabinet_path=cabinet.get_path())
+        
+        messages.error(request, "Incorrect answer. Please try again.")
+        return redirect('home')
+
+    def _handle_question_flow(self, request, cabinet):
+        """Handle question validation flow"""
         if not cabinet.requires_questions:
-            return redirect('cabinet', cabinet_path=cabinet.name)
-
-        questions = cabinet.questions.all()
-        if not questions:
-            messages.error(request, "No questions available for this cabinet")
+            return redirect('cabinet', cabinet_path=cabinet.get_path())
+            
+        if not cabinet.questions.exists():
+            messages.error(request, "No questions available")
             return redirect('home')
-
-        form = AnswerForm(questions.first())
+            
         return render(request, 'quiz.html', {
-            'form': form,
+            'form': AnswerForm(cabinet.questions.first()),
             'cabinet': cabinet
         })
 
-    def post(self, request, cabinet_id):
-        cabinet = CabinetModel.objects.get(id=cabinet_id)
-        question = cabinet.questions.first()
-        form = AnswerForm(question, request.POST)
-    
-        if form.is_valid():
-            selected_answer = form.cleaned_data['answer']
-            if selected_answer.is_correct:
-                status, created = UserCabinetStatus.objects.get_or_create(
-                    user = request.user,
-                    cabinet = cabinet,
-                    defaults={"locked": False}
-                )
-                if not created:
-                    status.locked = False
-                    status.save()
-
-                # Build the full path for the cabinet
-                path_parts = []
-                current = cabinet
-                while current:
-                    path_parts.insert(0, current.name)
-                    current = current.parent
-                cabinet_path = '/'.join(path_parts)
-                return redirect('cabinet', cabinet_path=cabinet_path)
-            else:
-                messages.error(request, "Incorrect answer. Please try again.")
-                return redirect('home')
-        
-        return render(request, 'quiz.html', {
-            'form': form,
-            'cabinet': cabinet
-    })
+    def _unlock_cabinet(self, user, cabinet):
+        """Update or create user cabinet status"""
+        UserCabinetStatus.objects.update_or_create(
+            user=user,
+            cabinet=cabinet,
+            defaults={'locked': False}
+        )
 
 
 class Login(View):

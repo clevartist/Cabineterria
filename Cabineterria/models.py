@@ -30,6 +30,16 @@ class CabinetModel(models.Model):
         return result
 
 
+    def get_path(self):
+        # Generate cabinet URL path from hierarchy
+        path = []
+        current = self
+        while current:
+            path.insert(0, current.name)
+            current = current.parent
+        return '/'.join(path)
+
+
 
 class Question(models.Model):
     cabinet = models.ForeignKey(CabinetModel, on_delete=models.CASCADE, related_name="questions")
