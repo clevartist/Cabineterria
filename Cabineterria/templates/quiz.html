@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container">
+    <h2>{{ form.question.title }}</h2>
+    
+    <form method="post">
+        {% csrf_token %}
+        <div class="answer-choices">
+            {% for choice in form.answer %}
+            <div class="answer-option">
+                <input type="radio" 
+                       name="{{ choice.data.name }}" 
+                       value="{{ choice.data.value }}" 
+                       id="choice_{{ forloop.counter }}"
+                       required>
+                <label for="choice_{{ forloop.counter }}">
+                    {{ choice.choice_label }}
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary mt-3">Submit Answer</button>
+    </form>
+</div>
+{% endblock %}
