@@ -11,11 +11,21 @@ from django.contrib import messages
 
 class Home(View):
     def get(self, request):
+        # Reset cabinets with 'requires_questions_remember=True'
+        cabinets_to_reset = CabinetModel.objects.filter(requires_questions_remember=True)
+        cabinets_to_reset.update(requires_questions=True)  # Reset to original value
+        
+        # Reset user's locked status for these cabinets
+        if request.user.is_authenticated:
+            for cabinet in cabinets_to_reset:
+                UserCabinetStatus.objects.update_or_create(
+                    user=request.user,
+                    cabinet=cabinet,
+                    defaults={'locked': True}  # Force re-answering
+                )
+        
+        # Display top-level cabinets on home page
         cabinets = CabinetModel.objects.filter(parent=None)
-
-        all_cabinets = CabinetModel.objects.all()
-        all_cabinets.requires_questions = True
-
         context = {'cabinets': cabinets, 'user': request.user}
         return render(request, 'home.html', context)
 
@@ -32,7 +42,8 @@ class CabinetView(View):
                     current_cabinet = CabinetModel.objects.get(name=name, parent=current_cabinet)
             if current_cabinet is None:
                 return redirect('home')
-            # Check if the current user locked this cabinet.
+                
+            # Check individual user's locked state
             try:
                 status = UserCabinetStatus.objects.get(user=request.user, cabinet=current_cabinet)
                 user_locked = status.locked
@@ -57,7 +68,6 @@ class BuildCabinet(View):
     @method_decorator(login_required(login_url='login'))
     def get(self, request, cabinet_path=None):
         if cabinet_path:
-            # Existing logic for building a subcabinet
             try:
                 cabinet_names = cabinet_path.split('/')
                 current_cabinet = None
@@ -101,22 +111,27 @@ class BuildCabinet(View):
                 messages.error(request, "Cabinet not found")
                 return redirect('home')
 
+
             form = CabinetForm(request.POST)
             if form.is_valid():
-                cabinet = form.save(commit=False)
+                cabinet = form.save()
                 cabinet.owner = request.user
                 cabinet.parent = current_cabinet
+                if cabinet.requires_questions:
+                    cabinet.requires_questions_remember = True
+                
                 cabinet.save()
                 return redirect('home')
+            
+
             context = {'form': form}
             return render(request, 'buildCab.html', context)
         else:
             # For top-level cabinet building
             form = CabinetForm(request.POST)
             if form.is_valid():
-                cabinet = form.save(commit=False)
+                cabinet = form.save()
                 cabinet.owner = request.user
-                # parent remains None for top-level cabinets
                 cabinet.save()
                 return redirect('home')
             return render(request, 'buildCab.html', {'form': form})

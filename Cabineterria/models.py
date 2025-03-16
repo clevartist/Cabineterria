@@ -9,6 +9,7 @@ class CabinetModel(models.Model):
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='children')
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     requires_questions = models.BooleanField(default=False)
+    requires_questions_remember = models.BooleanField(default=False)
 
 
     def __str__(self):
