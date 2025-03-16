@@ -12,12 +12,12 @@ from .utils import get_cabinet_from_path, validate_cabinet_access
 
 class Home(View):
     def get(self, request):
-        self._reset_question_cabinets(request.user)
+        self.reset_question_cabinets(request.user)
         cabinets = CabinetModel.objects.filter(parent=None)
         return render(request, 'home.html', {'cabinets': cabinets})
 
-    def _reset_question_cabinets(self, user):
-        """Reset cabinets requiring questions and user lock status"""
+    def reset_question_cabinets(self, user):
+        # Reset cabinets requiring questions and user lock status
         cabinets = CabinetModel.objects.filter(requires_questions_remember=True)
         cabinets.update(requires_questions=True)
         

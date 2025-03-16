@@ -31,7 +31,7 @@ class CabinetModel(models.Model):
 
 
     def get_path(self):
-        """Generate cabinet URL path from hierarchy"""
+        # Generate cabinet URL path from hierarchy
         path = []
         current = self
         while current:

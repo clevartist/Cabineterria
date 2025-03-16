@@ -1,8 +1,7 @@
-from django.shortcuts import get_object_or_404
 from .models import CabinetModel, UserCabinetStatus
 
 def get_cabinet_from_path(path):
-    """Resolve cabinet hierarchy from URL path"""
+    # Resolve cabinet hierarchy from URL path
     if not path:
         return None
     
@@ -18,7 +17,7 @@ def get_cabinet_from_path(path):
     return current
 
 def validate_cabinet_access(user, cabinet):
-    """Check if user can access cabinet"""
+    # Check if user can access cabinet
     if not cabinet.requires_questions:
         return True
         
