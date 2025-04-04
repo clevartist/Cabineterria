@@ -12,7 +12,19 @@ class AnswerForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.question = question
 
-        answers = [(answer.id, answer.title)for answer in question.answers.all()]
+        # answers = [(answer.id, answer.title)for answer in question.answers.all()]
+        try:
+            answers = []
+            for answer in question.answers.all():
+                if answer.id and answer.title:
+                    answers.append((answer.id, answer.title))
+            
+            if not answer:
+                answers.append(0, "Error")
+        except AttributeError:
+            answers.append(0, "Error loading answers")
+
+
         self.fields['answer'] = forms.ChoiceField(
             choices=answers,
             widget=forms.RadioSelect(attrs={'class': 'btn-check'}),
@@ -23,6 +35,7 @@ class AnswerForm(forms.Form):
         answer_id = self.cleaned_data['answer']
         answer = Answers.objects.get(id=answer_id)
         return answer
+
 
 class LoginForm(forms.ModelForm):
     class Meta:

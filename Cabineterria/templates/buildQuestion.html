@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+  <h1>Give this cabinet some questions</h1>
+  <form method="POST">
+    {% csrf_token %}
+    <input type="text" id="questionTitle" name="question_title" placeholder="Question title" />
+
+    <p>Answers:</p>
+    <span>checkbox for correct answer</span>
+
+    {% if answers < 2 %}
+    <p style="color: red;">Number of answers must be >= 2</p>
+    {% endif %}
+    
+    <div id="answersContainer">
+        {% for answer in answers_range %}
+        <div id="childDiv">
+            <input type="text" id="answerTitle" name="answer_title_{{answer}}" placeholder="Answer {{ answer }}" />
+            <input type="checkbox" name="{{answer}}"/>
+        </div>
+        {% endfor %}
+    </div>
+
+    <input type="button" value="Add answer" onclick="addNewAnswer()" />
+    <input type="hidden" id="answerCount" value="{{answers}}" />
+    <input type="submit" value="Attach question" />
+  </form>
+</div>
+
+<script>
+    function addNewAnswer(){
+        // initializing variables
+        const answersContainer = document.getElementById("answersContainer");
+        let answerCount = parseInt(document.getElementById("answerCount").value);
+        answerCount += 1; // adding new answer
+
+
+        // creating new answer
+        // creating new childDiv
+        let childDiv = document.createElement("div");
+        
+        // creating new answer title
+        let newInput = document.createElement("input");
+        newInput.type = "text";
+        newInput.name = `answer_title_${answerCount}`;
+        newInput.placeholder = `Answer ${answerCount}`;
+
+        // creating new checkbox
+        let newCheckbox = document.createElement("input");
+        newCheckbox.type = "checkbox";
+        newCheckbox.name = answerCount;
+
+        // appending new answer to the childDiv
+        childDiv.appendChild(newInput);
+        childDiv.appendChild(newCheckbox);
+
+        // appending new childDiv to answersContainer
+        answersContainer.appendChild(childDiv);
+
+        // update hidden input
+        document.getElementById("answerCount").value = answerCount;
+    }
+</script>
+{% endblock %}

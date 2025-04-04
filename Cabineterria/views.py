@@ -6,7 +6,7 @@ from django.utils.decorators import method_decorator
 from django.contrib import messages
 from django.contrib.auth.models import User
 from .models import CabinetModel, UserCabinetStatus
-from .forms import CabinetForm, LoginForm, SignupForm, AnswerForm
+from .forms import CabinetForm, LoginForm, SignupForm, AnswerForm, QuestionForm
 from .utils import get_cabinet_from_path, validate_cabinet_access
 
 
@@ -68,31 +68,74 @@ class BuildCabinet(View):
         form = CabinetForm(request.POST)
         
         if form.is_valid():
+            requires_questions = form.cleaned_data["requires_questions"]
+            
             return self._handle_valid_form(form, request.user, parent)
         
         return render(request, 'buildCab.html', {'form': form})
 
-    def _get_valid_parent(self, user, path):
+    def _get_valid_parent(self, request, user, path):
         """Validate and return parent cabinet if path exists"""
         if not path:
             return None
             
         parent = get_cabinet_from_path(path)
         if parent and parent.owner != user:
-            messages.error(self.request, "Permission denied")
+            messages.error(request, "Permission denied")
             return None
         return parent
 
-    def _handle_valid_form(self, form, user, parent):
+    def _handle_valid_form(self, request, form, user, parent):
         """Process valid cabinet form"""
         cabinet = form.save(commit=False)
         cabinet.owner = user
         cabinet.parent = parent
         cabinet.requires_questions_remember = cabinet.requires_questions
         cabinet.save()
-        messages.success(self.request, "Cabinet created successfully")
+        messages.success(request, "Cabinet created successfully")
         return redirect('home')
 
+@method_decorator(login_required, name='dispatch')
+class BuildQuestion(View):
+    def get(self, request):
+        number_of_answers = 2
+        answers_range = range(1, 3)
+        return render(request, 'buildQuestion.html', {
+            'answers': number_of_answers,
+            'answers_range': answers_range,
+        })
+    
+    def post(self, request):
+        question_title = request.POST.get("question_title")
+        answers = {}
+
+        for key in request.POST:
+            if key.startswith("answer_title_"):
+                answer_id = key.split("_")[-1]
+                answer_title = request.POST.get(key)
+                is_correct = bool(request.POST.get(answer_id))
+                answers[answer_title] = is_correct
+        return redirect('home')
+
+def post(self, request):
+    question_title = request.POST.get("question_title")
+    answers = {}
+
+    for key in request.POST:
+        if key.startswith("answer_title_"):
+            answer_num = key.split("_")[-1]
+            answer_text = request.POST.get(key)
+            is_correct = bool(request.POST.get(answer_num))
+            answers[f"answer_{answer_num}"] = {
+                "text": answer_text,
+                "correct": is_correct
+            }
+
+    # Now `answers` is like:
+    # {
+    #   "answer_1": {"text": "Some answer", "correct": True},
+    #   "answer_2": {"text": "Another", "correct": False}
+    # }
 
 class Answer(View):
     def get(self, request, cabinet_id):
